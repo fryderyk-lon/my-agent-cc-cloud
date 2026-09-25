@@ -1,6 +1,6 @@
 # ghost-render：机灵宠物渲染原型
 
-把 3D 打印用的机灵 STL 套件按实物装配关系组装成游戏里的造型，并渲染出宠物的各个状态（空闲、工作中、等待批准、完成、出错、休眠）。这是可行性验证用的原型，不是宠物 App 本身。
+把 3D 打印用的机灵 STL 套件按实物装配关系组装成游戏里的造型，渲染出宠物的各个状态，并打包成 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) 主题。
 
 ## 模型文件（不在仓库里）
 
@@ -28,7 +28,14 @@ python3 scripts/make-gif.py frames ghost_states.gif   # 合成带中文标签的
 
 # 从 STL 重新推导装配常数（需要 trimesh、manifold3d 等，见脚本开头）
 python3 scripts/derive-assembly.py stl
+
+# 生成 clawd-on-desk 主题：渲染 21 段动画 -> WebP -> theme.json -> destiny-ghost.zip（需要 Pillow）
+npm run theme:frames   # 约 5 分钟，帧输出到 build/clawd-theme/frames
+npm run theme:pack     # 输出 build/clawd-theme/destiny-ghost/ 和 destiny-ghost.zip
+# 浏览器里预览这些动画片段：npm run preview，然后打开 index.html?ui=clips
 ```
+
+动画片段定义在 `src/theme-clips.js`，里面也写明了每段对应 clawd 的哪个状态。循环片段首尾无缝：所有周期项都能整除片段时长，外壳圈的转角是 90° 的整数倍。
 
 ## 组装是怎么还原的
 

@@ -82,9 +82,11 @@ Claude Code 没有内置桌面宠物（v2.1.89 的愚人节彩蛋 `/buddy` 是�
 - 机灵造型本身是 Bungie 的 IP，建议只做个人、非商业用途。
 - 所以本仓库只提交原创代码，STL 和渲染结果都在 `.gitignore` 里。如果将来要开源发布，需要换成原创造型，或取得模型作者的授权。
 
-## 7. 待确认
+## 7. 已确定的方案（2026-09-25）
 
-1. 你的系统（macOS / Windows / Linux），以及平时在哪里用 Claude Code（终端、IDE 扩展、桌面 App，还是网页云端）。
-2. 路线：A（最快）、C（最像游戏），还是先 A 再 C。
-3. 配色：经典白壳青眼、Claude 橙色，还是都要。
-4. 是否打算公开分享。这决定能不能直接用这个模型。
+- 环境：MacBook Pro，在 Claude 桌面 App 里用 Claude Code（本地会话）
+- 路线：A，即 clawd-on-desk 加机灵主题，并且要兼容现有的 Claude Code 全局配置
+- 配色：经典白壳青眼
+- 用途：自用，不公开
+
+安装步骤和配置兼容性检查见 [clawd-ghost-setup.md](clawd-ghost-setup.md)。

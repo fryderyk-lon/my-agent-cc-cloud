@@ -7,7 +7,9 @@
     "preview": "npx --yes http-server -c-1 -p 5173 .",
     "stills": "node scripts/render-stills.mjs shots/states.json out 600",
     "assembly": "node scripts/render-stills.mjs shots/assembly.json out 600",
-    "anim": "node scripts/render-anim.mjs shots/sequence.json frames 256 15"
+    "anim": "node scripts/render-anim.mjs shots/sequence.json frames 256 15",
+    "theme:frames": "node scripts/build-clawd-theme.mjs build/clawd-theme 320 classic",
+    "theme:pack": "python3 scripts/pack-clawd-theme.py build/clawd-theme"
   },
   "dependencies": {
     "three": "0.180.0"

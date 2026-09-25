@@ -16,12 +16,14 @@
 <script type="module">
 // Preview harness. Two modes:
 //   index.html?ui=1[&theme=claude]  live animated preview with a state switcher (open in a browser)
+//   index.html?ui=clips              live preview of the clawd theme clips
 //   index.html                      static page driven by scripts/render-*.mjs through window.api
 import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildGhost, PART_FILES, CLAUDE_THEME, DEFAULT_THEME } from './src/ghost-model.js';
 import { pose as animPose, STATES } from './src/anim.js';
+import { CLIPS, VIEW } from './src/theme-clips.js';
 
 const q = new URLSearchParams(location.search);
 const live = q.has('ui');
@@ -64,6 +66,14 @@ window.api = {
     camera.lookAt(0, 0, 0); renderer.render(scene, camera);
   },
   anim(state, t) { this.pose(animPose(state, t, (theme ?? DEFAULT_THEME).eye ?? DEFAULT_THEME.eye)); },
+  // clawd theme clips (src/theme-clips.js), always framed by the shared VIEW camera
+  clipList() { return CLIPS.map(({ id, fps, duration, loop }) => ({ id, fps, duration, loop })); },
+  clip(id, t) {
+    const clip = CLIPS.find(c => c.id === id);
+    if (!clip) throw new Error(`unknown clip ${id}`);
+    this.pose(clip.pose(t));
+    this.view(VIEW.azimuth, VIEW.elevation, VIEW.distance);
+  },
   // see src/anim.js for what each field means
   pose({ open = 0, ringFront = 0, ringBack = 0, eye, eyeIntensity = 1, yaw = 0, pitch = 0, roll = 0, hover = 0 } = {}) {
     ghost.setLift(open);
@@ -79,13 +89,18 @@ if (live) {
   document.body.classList.add('ui');
   let state = 'idle', since = performance.now();
   const bar = document.getElementById('bar');
-  for (const s of STATES) {
+  const names = q.get('ui') === 'clips' ? CLIPS.map(c => c.id) : STATES;
+  const play = q.get('ui') === 'clips'
+    ? (s, t) => { const c = CLIPS.find(x => x.id === s); window.api.clip(s, c.loop ? t % c.duration : Math.min(t, c.duration)); }
+    : (s, t) => { window.api.anim(s, t); window.api.view(0, 4, 400); };
+  for (const s of names) {
     const b = document.createElement('button'); b.textContent = s; b.dataset.s = s;
     b.onclick = () => { state = s; since = performance.now(); [...bar.children].forEach(x => x.classList.toggle('on', x.dataset.s === s)); };
     bar.appendChild(b);
   }
   bar.firstChild.classList.add('on');
-  const frame = (now) => { window.api.anim(state, (now - since) / 1000); window.api.view(0, 4, 400); requestAnimationFrame(frame); };
+  state = names[0];
+  const frame = (now) => { play(state, (now - since) / 1000); requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
 } else {
   window.api.view(30, 12);

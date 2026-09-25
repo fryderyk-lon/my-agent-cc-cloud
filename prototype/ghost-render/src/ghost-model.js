@@ -98,20 +98,28 @@ export function buildGhost(geoms, opts = {}) {
       corner.add(mesh(geoms.wing_inside, mats.inner, B.clone().multiply(plateSeat)));
       corner.add(mesh(geoms.cap, mats.shell, B.clone().multiply(capSeat)));
       const dir = CORNER_AXIS.clone().applyMatrix4(new THREE.Matrix4().extractRotation(B));
-      (slot[0] === 'f' ? rings.front : rings.back).add(corner);
-      corners.push({ slot: slot + (side ? ':side' : ':top-bottom'), corner, dir });
+      const ring = slot[0] === 'f' ? 'front' : 'back';
+      rings[ring].add(corner);
+      // phase: angle of the corner around the eye axis (0 = +Y side, 90 = top), for wave effects
+      const phase = THREE.MathUtils.radToDeg(Math.atan2(dir.z, dir.y));
+      corners.push({ slot: slot + (side ? ':side' : ':top-bottom'), ring, phase, corner, dir });
     }
   }
 
+  // Lifting only moves a corner outward along its own axis, away from its neighbours, so any
+  // mix of per-corner lifts is collision-free.
   function setLift(mm) {
-    const lift = Math.max(0, mm);             // corners cannot sink into each other or the core
-    for (const c of corners) c.corner.position.copy(c.dir).multiplyScalar(lift - REST_INSET);
+    for (const c of corners) {
+      const lift = Math.max(0, typeof mm === 'function' ? mm(c) : mm);   // never sink into the core
+      c.corner.position.copy(c.dir).multiplyScalar(lift - REST_INSET);
+    }
   }
   setLift(0);
 
   return {
     root, model, core, eye, halo, rings, corners, mats,
-    /** how far (mm) every corner lifts off the core along its own axis; 0 = closed shell */
+    /** how far (mm) the corners lift off the core along their own axes; 0 = closed shell.
+     *  Either one number for all corners or a function ({ ring, phase, slot }) => mm. */
     setLift,
     /** intensity 0..1.5 scales the (unlit) eye colour and its halo */
     setEyeColor(hex, intensity = 1) {
