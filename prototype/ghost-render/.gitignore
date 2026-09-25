@@ -1,0 +1,10 @@
+node_modules/
+# The Ghost STL kit is CC BY-NC-ND 4.0 and must not be redistributed from this public repo;
+# renders of it are adaptations and stay local too. No trailing slash so a symlinked stl/ is ignored as well.
+/stl
+/out
+/frames
+*.gif
+*.png
+*.webp
+*.stl

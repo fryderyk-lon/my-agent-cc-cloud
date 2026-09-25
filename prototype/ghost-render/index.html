@@ -1,0 +1,95 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Ghost Pet Preview</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; font: 13px system-ui, sans-serif; }
+  canvas { display: block; }
+  body.ui { background: #262a31; }
+  #bar { position: fixed; left: 8px; right: 8px; bottom: 8px; display: none; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  body.ui #bar { display: flex; }
+  #bar button { border: 1px solid #555c66; background: #1b1e23; color: #e8ebef; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  #bar button.on { border-color: #3fd4ff; }
+</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<div id="bar"></div>
+<script type="module">
+// Preview harness. Two modes:
+//   index.html?ui=1[&theme=claude]  live animated preview with a state switcher (open in a browser)
+//   index.html                      static page driven by scripts/render-*.mjs through window.api
+import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { buildGhost, PART_FILES, CLAUDE_THEME, DEFAULT_THEME } from './src/ghost-model.js';
+import { pose as animPose, STATES } from './src/anim.js';
+
+const q = new URLSearchParams(location.search);
+const live = q.has('ui');
+const W = live ? innerWidth : +(q.get('w') || 600), H = live ? innerHeight : +(q.get('h') || 600);
+const THEMES = { classic: undefined, claude: CLAUDE_THEME };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: !live });
+renderer.setPixelRatio(live ? devicePixelRatio : 1); renderer.setSize(W, H); renderer.setClearColor(0, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(160, 220, 260); scene.add(key);
+const rim = new THREE.DirectionalLight(0xa9c8ff, 1.6); rim.position.set(-260, 80, -220); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xe8eeff, 0x2a2d33, 0.5));
+const camera = new THREE.PerspectiveCamera(28, W / H, 1, 3000);
+
+const loader = new STLLoader();
+const geoms = Object.fromEntries(await Promise.all(PART_FILES.map(n => new Promise((res, rej) =>
+  loader.load(`./stl/${n}.stl`, g => { g.computeVertexNormals(); res([n, g]); }, undefined,
+    () => rej(new Error(`missing stl/${n}.stl — unzip the Ghost kit into ./stl (see README)`)))))));
+
+let theme = THEMES[q.get('theme') || 'classic'];
+let ghost = buildGhost(geoms, { theme });
+scene.add(ghost.root);
+
+const rad = THREE.MathUtils.degToRad;
+window.api = {
+  setTheme(th) {
+    scene.remove(ghost.root);
+    theme = typeof th === 'string' ? THEMES[th] : th;
+    ghost = buildGhost(geoms, { theme });
+    scene.add(ghost.root);
+  },
+  view(az, el, dist = 360) {
+    camera.position.set(dist * Math.cos(rad(el)) * Math.sin(rad(az)), dist * Math.sin(rad(el)), dist * Math.cos(rad(el)) * Math.cos(rad(az)));
+    camera.lookAt(0, 0, 0); renderer.render(scene, camera);
+  },
+  anim(state, t) { this.pose(animPose(state, t, (theme ?? DEFAULT_THEME).eye ?? DEFAULT_THEME.eye)); },
+  // see src/anim.js for what each field means
+  pose({ open = 0, ringFront = 0, ringBack = 0, eye, eyeIntensity = 1, yaw = 0, pitch = 0, roll = 0, hover = 0 } = {}) {
+    ghost.setLift(open);
+    ghost.rings.front.rotation.x = rad(ringFront);      // model-local X is the eye axis
+    ghost.rings.back.rotation.x = rad(ringBack);
+    if (eye !== undefined) ghost.setEyeColor(eye, eyeIntensity);
+    ghost.root.rotation.set(rad(pitch), rad(yaw), rad(roll));
+    ghost.root.position.y = hover;
+  },
+};
+
+if (live) {
+  document.body.classList.add('ui');
+  let state = 'idle', since = performance.now();
+  const bar = document.getElementById('bar');
+  for (const s of STATES) {
+    const b = document.createElement('button'); b.textContent = s; b.dataset.s = s;
+    b.onclick = () => { state = s; since = performance.now(); [...bar.children].forEach(x => x.classList.toggle('on', x.dataset.s === s)); };
+    bar.appendChild(b);
+  }
+  bar.firstChild.classList.add('on');
+  const frame = (now) => { window.api.anim(state, (now - since) / 1000); window.api.view(0, 4, 400); requestAnimationFrame(frame); };
+  requestAnimationFrame(frame);
+} else {
+  window.api.view(30, 12);
+}
+window.ready = true;
+</script>
+</body></html>

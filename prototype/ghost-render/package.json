@@ -1,0 +1,18 @@
+{
+  "name": "ghost-pet-render-prototype",
+  "private": true,
+  "type": "module",
+  "description": "Feasibility prototype: renders the Destiny Ghost kit as a Claude Code desktop-pet in its different states",
+  "scripts": {
+    "preview": "npx --yes http-server -c-1 -p 5173 .",
+    "stills": "node scripts/render-stills.mjs shots/states.json out 600",
+    "assembly": "node scripts/render-stills.mjs shots/assembly.json out 600",
+    "anim": "node scripts/render-anim.mjs shots/sequence.json frames 256 15"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

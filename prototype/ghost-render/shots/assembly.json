@@ -1,0 +1,10 @@
+[
+ {"name":"asm_closed_front", "theme":"classic", "pose":{"open":0}, "view":[0,0,300]},
+ {"name":"asm_closed_34", "pose":{"open":0}, "view":[35,15,300]},
+ {"name":"asm_closed_side", "pose":{"open":0}, "view":[90,0,300]},
+ {"name":"asm_closed_back", "pose":{"open":0}, "view":[200,20,300]},
+ {"name":"asm_open6_34", "pose":{"open":6}, "view":[35,15,320]},
+ {"name":"asm_open14_34", "pose":{"open":14}, "view":[35,15,340]},
+ {"name":"asm_open24_34", "pose":{"open":24}, "view":[35,15,380]},
+ {"name":"asm_open24_back", "pose":{"open":24}, "view":[215,25,380]}
+]
