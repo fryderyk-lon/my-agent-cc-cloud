@@ -5,6 +5,7 @@
   html, body { margin: 0; background: transparent; overflow: hidden; font: 13px system-ui, sans-serif; }
   canvas { display: block; }
   body.ui { background: #262a31; }
+  body.ui.light { background: #e9e6e1; }
   #bar { position: fixed; left: 8px; right: 8px; bottom: 8px; display: none; gap: 6px; flex-wrap: wrap; justify-content: center; }
   body.ui #bar { display: flex; }
   #bar button { border: 1px solid #555c66; background: #1b1e23; color: #e8ebef; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
@@ -24,6 +25,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildGhost, PART_FILES, CLAUDE_THEME, DEFAULT_THEME } from './src/ghost-model.js';
 import { pose as animPose, STATES } from './src/anim.js';
 import { CLIPS, VIEW } from './src/theme-clips.js';
+import { ringRotationX } from './src/pose-map.js';
+import { makeEnergySphere, makeBurst, makeScan } from './src/effects.js';
 
 const q = new URLSearchParams(location.search);
 const live = q.has('ui');
@@ -50,43 +53,70 @@ const geoms = Object.fromEntries(await Promise.all(PART_FILES.map(n => new Promi
     () => rej(new Error(`missing stl/${n}.stl — unzip the Ghost kit into ./stl (see README)`)))))));
 
 let theme = THEMES[q.get('theme') || 'classic'];
-let ghost = buildGhost(geoms, { theme });
-scene.add(ghost.root);
+let ghost;
+const sphere = makeEnergySphere(), burst = makeBurst(), scan = makeScan();
+scene.add(burst.group);
+function mountGhost() {
+  if (ghost) scene.remove(ghost.root);
+  ghost = buildGhost(geoms, { theme });
+  ghost.root.add(sphere.mesh, sphere.radiance);   // follow hover and turn with the Ghost
+  ghost.core.add(scan.mesh);            // model frame: sweeps with the eye
+  scene.add(ghost.root);
+}
+mountGhost();
+let zoom = 1;
+// Backgrounds: 'transparent' for previews, 'black' / 'white' for the matted theme frames.
+function setBackground(bg) {
+  if (bg === 'black') renderer.setClearColor(0x000000, 1);
+  else if (bg === 'white') renderer.setClearColor(0xffffff, 1);
+  else renderer.setClearColor(0, 0);
+}
 
 const rad = THREE.MathUtils.degToRad;
+window.__ghost = () => ghost;   // diagnostics only (scripts/check-direction.mjs)
 window.api = {
   setTheme(th) {
-    scene.remove(ghost.root);
     theme = typeof th === 'string' ? THEMES[th] : th;
-    ghost = buildGhost(geoms, { theme });
-    scene.add(ghost.root);
+    mountGhost();
   },
+  setBackground,
   view(az, el, dist = 360) {
-    camera.position.set(dist * Math.cos(rad(el)) * Math.sin(rad(az)), dist * Math.sin(rad(el)), dist * Math.cos(rad(el)) * Math.cos(rad(az)));
+    const d = dist * zoom;
+    camera.position.set(d * Math.cos(rad(el)) * Math.sin(rad(az)), d * Math.sin(rad(el)), d * Math.cos(rad(el)) * Math.cos(rad(az)));
     camera.lookAt(0, 0, 0); renderer.render(scene, camera);
   },
   anim(state, t) { this.pose(animPose(state, t, (theme ?? DEFAULT_THEME).eye ?? DEFAULT_THEME.eye)); },
   // clawd theme clips (src/theme-clips.js), always framed by the shared VIEW camera
   clipList() { return CLIPS.map(({ id, fps, duration, loop }) => ({ id, fps, duration, loop })); },
-  clip(id, t) {
+  clip(id, t, bg) {
     const clip = CLIPS.find(c => c.id === id);
     if (!clip) throw new Error(`unknown clip ${id}`);
+    if (bg) setBackground(bg);
     this.pose(clip.pose(t));
     this.view(VIEW.azimuth, VIEW.elevation, VIEW.distance);
   },
-  // see src/anim.js for what each field means
-  pose({ open = 0, ringFront = 0, ringBack = 0, eye, eyeIntensity = 1, yaw = 0, pitch = 0, roll = 0, hover = 0 } = {}) {
-    ghost.setLift(open);
-    ghost.rings.front.rotation.x = rad(ringFront);      // model-local X is the eye axis
-    ghost.rings.back.rotation.x = rad(ringBack);
+  // see src/theme-clips.js for what each field means
+  pose(p = {}) {
+    const { open = 0, eye, eyeIntensity = 1, yaw = 0, pitch = 0, roll = 0, hover = 0 } = p;
+    ghost.setCorners(open, p.tumble);
+    const r = ringRotationX(p);                          // front clockwise, back counter-clockwise
+    ghost.rings.front.rotation.x = r.front;
+    ghost.rings.back.rotation.x = r.back;
     if (eye !== undefined) ghost.setEyeColor(eye, eyeIntensity);
+    ghost.setCoreGlow(p.core ?? 0.4, eye);
     ghost.root.rotation.set(rad(pitch), rad(yaw), rad(roll));
     ghost.root.position.y = hover;
+    sphere.set(p.sphere);
+    scan.set(p.scan);
+    burst.group.position.set(0, hover, 0);
+    zoom = p.zoom ?? 1;
+    burst.set(p.burst);
   },
 };
 
 if (live) {
   document.body.classList.add('ui');
+  if (q.get('bg') === 'light') document.body.classList.add('light');
   let state = 'idle', since = performance.now();
   const bar = document.getElementById('bar');
   const names = q.get('ui') === 'clips' ? CLIPS.map(c => c.id) : STATES;

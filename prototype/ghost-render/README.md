@@ -20,7 +20,8 @@ npm install
 # 在浏览器里实时预览，底部按钮切换状态；加 &theme=claude 换 Claude 配色
 npm run preview        # 然后打开 http://localhost:5173/index.html?ui=1
 
-# 无头渲染（Playwright + 软件 WebGL，没有显卡也能跑）
+# 无头渲染（Playwright；默认用本机 Chrome 走 GPU。没有显卡或 Chrome 时加 GHOST_GL=swiftshader，
+# 改用 Playwright 自带的 Chromium 软件渲染，需先 npx playwright install chromium）
 npm run stills         # 各状态静帧 -> out/
 npm run assembly       # 合拢 / 整角离开球体的对比 -> out/
 npm run anim           # 状态动画序列帧 -> frames/
@@ -29,7 +30,7 @@ python3 scripts/make-gif.py frames ghost_states.gif   # 合成带中文标签的
 # 从 STL 重新推导装配常数（需要 trimesh、manifold3d 等，见脚本开头）
 python3 scripts/derive-assembly.py stl
 
-# 生成 clawd-on-desk 主题：渲染 21 段动画 -> WebP -> theme.json -> destiny-ghost.zip（需要 Pillow）
+# 生成 clawd-on-desk 主题：渲染 29 段动画 -> WebP -> theme.json -> destiny-ghost.zip（需要 Pillow）
 npm run theme:frames   # 约 5 分钟，帧输出到 build/clawd-theme/frames
 npm run theme:pack     # 输出 build/clawd-theme/destiny-ghost/ 和 destiny-ghost.zip
 # 浏览器里预览这些动画片段：npm run preview，然后打开 index.html?ui=clips

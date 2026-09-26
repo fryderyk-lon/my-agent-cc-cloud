@@ -18,7 +18,7 @@ export function pose(state, t, themeEye = EYE.idle) {
       return { open: 0.8 + Math.sin(t * TAU / 4) * 0.8, eye: themeEye, eyeIntensity: 0.85 + 0.15 * Math.sin(t * TAU / 4),
         yaw: -16 + Math.sin(t * TAU / 7) * 14, pitch: 5 + Math.sin(t * TAU / 5) * 4, hover: bob };
     case 'working':       // corners lift off and the two rings counter-rotate, like the in-game scan
-      return { open: 9 + Math.sin(t * TAU * 0.9) * 2, ringFront: t * 160, ringBack: -t * 110,
+      return { open: 9 + Math.sin(t * TAU * 0.9) * 2, ringFront: t * 160, ringBack: t * 110,
         eye: themeEye, eyeIntensity: 1.15 + 0.2 * Math.sin(t * TAU * 2), yaw: -22 + Math.sin(t * TAU / 2.5) * 10, pitch: 8, hover: bob * 0.5 };
     case 'permission': {  // faces the user, amber eye pulses, corners flutter, head-tilt wobble
       const pulse = 0.5 + 0.5 * Math.sin(t * TAU * 1.4);

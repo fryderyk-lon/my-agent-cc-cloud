@@ -46,6 +46,7 @@ export function makeMaterials(theme = {}) {
     eyeGlow: new THREE.MeshBasicMaterial({ color: t.eye, toneMapped: false }),
     lens: new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.05, metalness: 0, clearcoat: 1, depthWrite: false }),
     halo: new THREE.SpriteMaterial({ map: haloTexture(), color: t.eye, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5, toneMapped: false }),
+    bloom: new THREE.SpriteMaterial({ map: haloTexture(), color: t.eye, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.05, toneMapped: false }),
   };
 }
 
@@ -63,6 +64,7 @@ function haloTexture() {
  * @param opts.theme colour overrides, see DEFAULT_THEME
  */
 export function buildGhost(geoms, opts = {}) {
+  const t = { ...DEFAULT_THEME, ...opts.theme };
   const mats = makeMaterials(opts.theme);
   const root = new THREE.Group();            // three.js frame: eye -> +Z, up -> +Y
   const model = new THREE.Group();
@@ -83,6 +85,11 @@ export function buildGhost(geoms, opts = {}) {
 
   const halo = new THREE.Sprite(mats.halo);
   halo.position.set(26, 0, 0); halo.scale.set(46, 46, 1); core.add(halo);
+  // Soft bloom round the eye and a light inside the shell: it catches the corners' inner faces and
+  // shows through the gaps between them (the "core" glow of a pose).
+  const bloom = new THREE.Sprite(mats.bloom);
+  bloom.position.set(30, 0, 0); bloom.scale.set(120, 120, 1); core.add(bloom);
+  const coreLight = new THREE.PointLight(0x3fd4ff, 0, 0, 2); core.add(coreLight);
 
   // Front and back rings of 4 corners, separate groups so they can orbit the eye axis.
   const rings = { front: new THREE.Group(), back: new THREE.Group() };
@@ -102,25 +109,49 @@ export function buildGhost(geoms, opts = {}) {
       rings[ring].add(corner);
       // phase: angle of the corner around the eye axis (0 = +Y side, 90 = top), for wave effects
       const phase = THREE.MathUtils.radToDeg(Math.atan2(dir.z, dir.y));
-      corners.push({ slot: slot + (side ? ':side' : ':top-bottom'), ring, phase, corner, dir });
+      // centre of the corner in its own frame, the pivot for tumbling
+      const box = new THREE.Box3();
+      for (const m of corner.children) {
+        m.geometry.computeBoundingBox();
+        box.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrix));
+      }
+      corners.push({ slot: slot + (side ? ':side' : ':top-bottom'), ring, phase, corner, dir, center: box.getCenter(new THREE.Vector3()) });
     }
   }
 
   // Lifting only moves a corner outward along its own axis, away from its neighbours, so any
-  // mix of per-corner lifts is collision-free.
-  function setLift(mm) {
+  // mix of per-corner lifts is collision-free. Tumbling turns a corner about its own centre; clips
+  // only tumble corners that have lifted well clear of the core.
+  const q = new THREE.Quaternion(), tmp = new THREE.Vector3();
+  function setCorners(mm, tumble) {
     for (const c of corners) {
       const lift = Math.max(0, typeof mm === 'function' ? mm(c) : mm);   // never sink into the core
       c.corner.position.copy(c.dir).multiplyScalar(lift - REST_INSET);
+      if (tumble) {
+        const r = tumble(c);
+        q.setFromAxisAngle(tmp.set(...r.axis).normalize(), deg(r.angle ?? 0));
+        c.corner.quaternion.copy(q);
+        c.corner.position.add(tmp.copy(c.center).sub(c.center.clone().applyQuaternion(q)));
+      } else {
+        c.corner.quaternion.identity();
+      }
     }
   }
+  const setLift = mm => setCorners(mm);
   setLift(0);
 
   return {
     root, model, core, eye, halo, rings, corners, mats,
     /** how far (mm) the corners lift off the core along their own axes; 0 = closed shell.
      *  Either one number for all corners or a function ({ ring, phase, slot }) => mm. */
-    setLift,
+    setLift, setCorners,
+    /** light inside the shell, 0..3; tinted with the eye colour */
+    setCoreGlow(k, hex) {
+      coreLight.color.setHex(hex ?? t.eye);
+      coreLight.intensity = 2500 * Math.max(0, k);
+      mats.bloom.color.setHex(hex ?? t.eye);
+      mats.bloom.opacity = Math.min(1, 0.12 * Math.max(0, k));
+    },
     /** intensity 0..1.5 scales the (unlit) eye colour and its halo */
     setEyeColor(hex, intensity = 1) {
       const k = Math.min(intensity, 1.5);

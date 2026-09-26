@@ -1,5 +1,5 @@
-// Shared helpers: a tiny static server for the preview page and a headless Chromium with
-// software WebGL (SwiftShader), so renders work on machines/CI without a GPU.
+// Shared helpers: a tiny static server for the preview page and a headless browser —
+// the installed Chrome on the GPU by default, or Chromium with software WebGL (GHOST_GL=swiftshader).
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,12 @@ export async function openPreview(size, query = '') {
     });
   }).listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
-  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  // Default: the installed Google Chrome on the GPU (fast, no browser download).
+  // GHOST_GL=swiftshader keeps the original software path for machines without a GPU or Chrome.
+  const soft = process.env.GHOST_GL === 'swiftshader';
+  const browser = await chromium.launch(soft
+    ? { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }
+    : { channel: 'chrome', args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: size, height: size } });
   page.on('pageerror', e => console.error('[page]', e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/index.html?w=${size}&h=${size}${query}`);
